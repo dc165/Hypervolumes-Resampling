@@ -29,6 +29,7 @@ bootstrap_seq <- function(name, hv, n = 10, points_per_resample = ncol(hv@Data),
                     name = paste("resample", as.character(i))
     )
     bootstrap(file.path(name, subdir), h, n, points_per_resample)
+    saveRDS(h, file.path('./Objects', name, subdir, 'original.rds'))
   }
   return(file.path(getwd(), 'Objects', name))
 }
@@ -64,6 +65,8 @@ k_split <- function(name, hv, k = 5) {
 }
 
 # Single interface for resampling
+# Creates Objects directory in current working directory
+# Returns absolute path to file with hypervolume files
 resample <- function(name, hv, method, n = 10, points_per_resample = nrow(hv@Data), k = 5, seq = 3:nrow(hv@Data)) {
   dir.create('./Objects', showWarnings = FALSE)
   if (method == 'bootstrap') {
