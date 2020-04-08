@@ -17,7 +17,7 @@ bootstrap <- function(name, hv, n = 10, points_per_resample = nrow(hv@Data)) {
   return(file.path(getwd(), 'Objects', name))
 }
 
-# n bootstrap hypervolumes for each size in points per resample
+# n bootstrap hypervolumes for each size in seq.
 bootstrap_seq <- function(name, hv, n = 10, points_per_resample = ncol(hv@Data), seq = 3:nrow(hv@Data)) {
   dir.create(file.path('./Objects', name))
   foreach(i = seq) %do% {
