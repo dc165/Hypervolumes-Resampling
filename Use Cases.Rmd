@@ -1,0 +1,42 @@
+---
+title: "Use Cases"
+author: "Daniel Chen"
+date: "4/15/2020"
+output: github_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+data(iris)
+source('resample.R')
+source('cross_validate.R')
+source('Funnels.R')
+hv = hypervolume(iris[,c(1, 2)])
+```
+
+## Generate Hypervolume and Resample
+Using the hypervolume that models the first two columns of the iris data set, we generate a sequence of bootstraps.
+```{r}
+# Samples i rows from the data that generated hv for each i in seq, then generates a bootstrap on each of these i resamples and saves to file.
+# Runtime ~2hrs
+# hv_bootstrap_seq <- resample('hv_bootstrap_seq', hv, method = 'bootstrap_seq', points_per_resample = NULL, seq = seq(10, 150, length.out = 29))
+# Here is the result of running the above code
+hv_bootstrap_seq <- "./Objects/hv_bootstrap_seq"
+```
+
+By creating funnel plots using the bootstrap sequence, we can see that our mean resampled data and mean random points both converge to the mean of our original sample.
+```{r, fig.show='hold', out.width='50%'}
+par(mfrow=c(1,2))
+funnel(hv_bootstrap_seq, title = 'From resampled data', func = function(x) {mean(x@Data[,1])}) + 
+  geom_line(aes(y = mean(hv@Data[,1]))) + 
+  ylim(5.25, 6.5) +
+  ylab('Mean Sepal Length')
+funnel(hv_bootstrap_seq, title = 'From random points', func = function(x) {mean(x@RandomPoints[,1])}) + 
+  geom_line(aes(y = mean(hv@Data[,1]))) + 
+  ylim(5.25, 6.5) +
+  ylab(NULL)
+```
+
