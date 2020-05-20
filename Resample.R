@@ -1,10 +1,11 @@
 library(hypervolume)
 library(foreach)
 library(progress)
+library(mvtnorm)
 source('Utils.R')
 
 # take a sample of points_per_sample points each iteration to get n resampled hypervolumes
-bootstrap <- function(name, hv, n = 10, points_per_resample = 'sample_size', verbose = TRUE, center_bias = 0) {
+bootstrap <- function(name, hv, n = 10, points_per_resample = 'sample_size', verbose = TRUE) {
   dir.create(file.path('./Objects', name))
   if(verbose) {
     pb = progress_bar$new(total = n)
@@ -70,49 +71,53 @@ k_split <- function(name, hv, k = 5, verbose = TRUE) {
   return(file.path(getwd(), 'Objects', name))
 }
 
-# Create center biased empirical cdf
-# implement k-d tree in future for efficient calculation of cdf
-# How to give user control over shape of bias?
-# Note: Reorder random point generation -> create ecdf lookup-table -> get first column of points -> create conditional lookup-tables ->
-sampling_bias_hv <- function(hv, points_per_resample) {
-  random_points = foreach (n = 1:points_per_resample, .combine = rbind) %do% {
-    random_point = matrix(nrow = 1, ncol = ncol(hv@Data))
-    dat = hv@Data
-    # generate conditional empirical cdf for each data point and find return value
-    # random_point[i_n] = inverse_CDF(cdf | i_1, i_2,..., i_(n-1))
-    foreach (i = 1:ncol(dat)) %do% {
-      curr_cdf = 2
-      # generate number 0-1 using normal distribution with cutoff at 0 and 1
-      cdf = -1
-      while (cdf < 0 | cdf > 1) {
-        cdf = rnorm(1, 0.5, 1/6)
-      }
-      foreach (j = 1:nrow(dat)) %do% {
-        marginal_ecdf = ecdf(dat[j, i], dat, i)
-        if (marginal_ecdf < curr_cdf & marginal_ecdf >= cdf) {
-          curr_cdf = marginal_ecdf
-          random_point[i] = dat[j, i]
-        }
-      }
-      dat = matrix(dat[dat[,i] == random_point[i],], ncol = ncol(hv@Data))
-    }
-    random_point 
+# Introduce bias using weights and multinomial random numbers
+# Generate weights from distribution
+# mu has same number of dimensions as cols_to_bias, point to bias towards
+# sigma has same number of dimensions as cols_to_bias, strength of bias in each dimension
+# cols_to_bias are indices of hv@Data
+sampling_bias_bootstrap <- function(name, hv, n = 10, points_per_resample = 'sample_size', verbose = TRUE, mu, sigma, cols_to_bias = 1:ncol(hv@Data)) {
+  dir.create(file.path('./Objects', name))
+  if(verbose) {
+    pb = progress_bar$new(total = n)
   }
-  return(random_points)
+  foreach(i = 1:n, .combine = c) %do% {
+    weights = dmvnorm(hv@Data[,cols_to_bias], mean = mu, sigma = diag(sigma))
+    if(points_per_resample == 'sample_size') {
+      points = apply(rmultinom(nrow(hv@Data), 1, weights) == 1, 2, which)
+    } else {
+      points = apply(rmultinom(points_per_resample, 1, weights) == 1, 2, which)
+    }
+    sample_dat = hv@Data[points,]
+    h = copy_param_hypervolume(hv, sample_dat, name = paste("resample", as.character(i)))
+    path = paste0(h@Name, '.rds')
+    saveRDS(h, file.path('./Objects', name, path))
+    if(verbose) {
+      pb$tick()
+    }
+  }
+  return(file.path(getwd(), 'Objects', name))
 }
 
 # Single interface for resampling
 # Creates Objects directory in current working directory
 # Returns absolute path to file with hypervolume files
-resample <- function(name, hv, method, n = 10, points_per_resample = 'sample_size', k = 5, seq = 3:nrow(hv@Data), verbose = TRUE) {
+resample <- function(name, hv, method, n = 10, points_per_resample = 'sample_size', seq = 3:nrow(hv@Data), verbose = TRUE, mu = NULL, sigma = NULL, cols_to_bias = 1:ncol(hv@Data)) {
+  if (n <= 0) {
+    stop("Invalid value for n")
+  } else if (points_per_resample != "sample size" & points_per_resample <= 0) {
+    stop("Invalid value for points_per_resample")
+  } else if (seq[1] <= 0) {
+    stop("Invalid input for seq")
+  } else if (length(mu) != length(sigma) | length(mu) != length(cols_to_bias)) {
+    stop("mu, sigma, and cols_to_bias must have same length")
+  }
   dir.create('./Objects', showWarnings = FALSE)
   if (method == 'bootstrap') {
     return(bootstrap(name, hv, n, points_per_resample, verbose))
-  } else if (method == 'bootstrap_seq') {
+  } else if (method == 'bootstrap seq') {
     return(bootstrap_seq(name, hv, n, points_per_resample, seq, verbose))
-  } else if (method == 'k-fold') {
-    return(k_split(name, hv, k, verbose))
-  } else if (method == 'LOO') {
-    return(k_split(name, hv, nrow(hv@Data)))
+  } else if (method == 'biased bootstrap') {
+    return(sampling_bias_bootstrap(name, hv, n, points_per_resample, verbose, mu, sigma, cols_to_bias))
   }
 }
