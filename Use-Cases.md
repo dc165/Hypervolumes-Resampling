@@ -56,7 +56,7 @@ hv = hypervolume(iris[,c(1, 2)])
     ## Ball query... 
     ## 
     ## done.
-    ## Requested probability quantile 0.950000, obtained 0.949020 - setting threshold value 0.000180.
+    ## Requested probability quantile 0.950000, obtained 0.949783 - setting threshold value 0.000180.
     ##  For a closer match, you can increase num.thresholds in hypervolume_threshold.
 
 ## Generate Hypervolume and Resample
@@ -68,7 +68,7 @@ bootstraps.
 ``` r
 # Samples i rows from the data that generated hv for each i in seq, then generates a bootstrap on each of these i resamples and saves to file.
 # Runtime ~2hrs
-# hv_bootstrap_seq <- resample('hv_bootstrap_seq', hv, method = 'bootstrap_seq', points_per_resample = NULL, seq = seq(10, 150, length.out = 29))
+# hv_bootstrap_seq <- resample('hv_bootstrap_seq', hv, method = 'bootstrap seq', points_per_resample = "sample size", seq = seq(10, 150, length.out = 29))
 # Here is the result of running the above code
 hv_bootstrap_seq <- "./Objects/hv_bootstrap_seq"
 ```
@@ -90,3 +90,106 @@ funnel(hv_bootstrap_seq, title = 'From random points', func = function(x) {mean(
 ```
 
 <img src="Use-Cases_files/figure-gfm/unnamed-chunk-3-1.png" width="50%" /><img src="Use-Cases_files/figure-gfm/unnamed-chunk-3-2.png" width="50%" />
+
+Variance of a kernel density estimate is greater than sample variance as
+expected, but converges to sample variance for large n.  
+Bootstrapped volumes seem unbiased; however the 95% confidence interval
+is skewed.
+
+``` r
+par(mfrow=c(1,2))
+funnel(hv_bootstrap_seq, title = 'Resampled variances from random points', func = function(x) {var(x@RandomPoints[,1])}) + 
+  geom_line(aes(y = var(hv@Data[,1])))
+
+funnel(hv_bootstrap_seq, title = 'Resampled volumes', func = get_volume) + 
+  geom_line(aes(y = get_volume(hv)))
+```
+
+<img src="Use-Cases_files/figure-gfm/unnamed-chunk-4-1.png" width="50%" /><img src="Use-Cases_files/figure-gfm/unnamed-chunk-4-2.png" width="50%" />
+
+## Biased resample
+
+We consider the iris dataset and want to see how a biased sampling
+method affects the data. For example, we suspect flowers with larger and
+more visible petals are over counted. To simulate overcounting petals,
+we perform a biased bootstrap.
+
+``` r
+# Hypervolume generated from iris data
+hv = hypervolume(iris[,1:4])
+```
+
+    ## Warning in hypervolume(iris[, 1:4]): 
+    ## Consider removing some axes.
+
+    ## 
+    ## Building tree... 
+    ## done.
+    ## Ball query... 
+    ## 
+    ## done.
+    ## 
+    ## Building tree... 
+    ## done.
+    ## Ball query... 
+    ## 
+    ## done.
+    ## 
+    ## Building tree... 
+    ## done.
+    ## Ball query... 
+    ## 
+    ## done.
+    ## 
+    ## Building tree... 
+    ## done.
+    ## Ball query... 
+    ## 
+    ## done.
+    ## 
+    ## Building tree... 
+    ## done.
+    ## Ball query... 
+    ## 
+    ## done.
+    ## Requested probability quantile 0.950000, obtained 0.947124 - setting threshold value 0.000019.
+    ##  For a closer match, you can increase num.thresholds in hypervolume_threshold.
+
+``` r
+# Weigh points with large values for petal length and petal width higher
+biased_path = resample("Petal bias", hv, method = "biased bootstrap", n = 1, mu = apply(hv@Data, 2, max)[c("Petal.Length", "Petal.Width")], sigma = apply(hv@Data, 2, sd)[c("Petal.Length", "Petal.Width")]*2, cols_to_bias = c("Petal.Length", "Petal.Width"))
+```
+
+    ## Warning in dir.create(file.path("./Objects", name)): '.\Objects\Petal bias'
+    ## already exists
+
+``` r
+biased_hv = readRDS(file.path(biased_path, "resample 1.rds"))
+```
+
+``` r
+ggplot(data.frame(hv@Data), aes(y = ..density..)) + 
+  geom_histogram(aes(x = Petal.Width), bins = 20, fill = 'blue', alpha = 0.5) + 
+  geom_histogram(aes(x = Petal.Length), bins = 20, fill = 'red', alpha = 0.5) + 
+  ggtitle("Unbiased distribution of petal length and width")
+ggplot(data.frame(biased_hv@Data), aes(y = ..density..)) + 
+  geom_histogram(aes(x = Petal.Width), bins = 20, fill = 'blue', alpha = 0.5) + 
+  geom_histogram(aes(x = Petal.Length), bins = 20, fill = 'red', alpha = 0.5) + 
+  ggtitle("Biased distribution of petal length and width")
+```
+
+<img src="Use-Cases_files/figure-gfm/unnamed-chunk-6-1.png" width="50%" /><img src="Use-Cases_files/figure-gfm/unnamed-chunk-6-2.png" width="50%" />
+Effect on sepal width and sepal length
+
+``` r
+ggplot(data.frame(hv@Data), aes(y = ..density..)) + 
+  geom_histogram(aes(x = Sepal.Width), bins = 20, fill = 'blue', alpha = 0.5) + 
+  geom_histogram(aes(x = Sepal.Length), bins = 20, fill = 'red', alpha = 0.5) + 
+  ggtitle("Unbiased distribution of sepal length and width")
+ggplot(data.frame(biased_hv@Data), aes(y = ..density..)) + 
+  geom_histogram(aes(x = Sepal.Width), bins = 20, fill = 'blue', alpha = 0.5) + 
+  geom_histogram(aes(x = Sepal.Length), bins = 20, fill = 'red', alpha = 0.5) + 
+  ggtitle("Biased distribution of sepal length and width")
+```
+
+<img src="Use-Cases_files/figure-gfm/unnamed-chunk-7-1.png" width="50%" /><img src="Use-Cases_files/figure-gfm/unnamed-chunk-7-2.png" width="50%" />
