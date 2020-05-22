@@ -56,7 +56,7 @@ hv = hypervolume(iris[,c(1, 2)])
     ## Ball query... 
     ## 
     ## done.
-    ## Requested probability quantile 0.950000, obtained 0.949783 - setting threshold value 0.000180.
+    ## Requested probability quantile 0.950000, obtained 0.949381 - setting threshold value 0.000174.
     ##  For a closer match, you can increase num.thresholds in hypervolume_threshold.
 
 ## Generate Hypervolume and Resample
@@ -75,10 +75,10 @@ hv_bootstrap_seq <- "./Objects/hv_bootstrap_seq"
 
 By creating funnel plots using the bootstrap sequence, we can see that
 our mean resampled data and mean random points both converge to the mean
-of our original sample.
+of our original
+sample.
 
 ``` r
-par(mfrow=c(1,2))
 funnel(hv_bootstrap_seq, title = 'From resampled data', func = function(x) {mean(x@Data[,1])}) + 
   geom_line(aes(y = mean(hv@Data[,1]))) + 
   ylim(5.25, 6.5) +
@@ -94,10 +94,10 @@ funnel(hv_bootstrap_seq, title = 'From random points', func = function(x) {mean(
 Variance of a kernel density estimate is greater than sample variance as
 expected, but converges to sample variance for large n.  
 Bootstrapped volumes seem unbiased; however the 95% confidence interval
-is skewed.
+is
+skewed.
 
 ``` r
-par(mfrow=c(1,2))
 funnel(hv_bootstrap_seq, title = 'Resampled variances from random points', func = function(x) {var(x@RandomPoints[,1])}) + 
   geom_line(aes(y = var(hv@Data[,1])))
 
@@ -152,7 +152,7 @@ hv = hypervolume(iris[,1:4])
     ## Ball query... 
     ## 
     ## done.
-    ## Requested probability quantile 0.950000, obtained 0.947124 - setting threshold value 0.000019.
+    ## Requested probability quantile 0.950000, obtained 0.946574 - setting threshold value 0.000020.
     ##  For a closer match, you can increase num.thresholds in hypervolume_threshold.
 
 ``` r
