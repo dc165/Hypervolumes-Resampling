@@ -75,14 +75,23 @@ k_split <- function(name, hv, k = 5, verbose = TRUE) {
 # Generate weights from distribution
 # mu has same number of dimensions as cols_to_bias, point to bias towards
 # sigma has same number of dimensions as cols_to_bias, strength of bias in each dimension
+# Use mu and sigma as parameters of multivariate normal distribution or input own weight function that takes in a matrix argument
 # cols_to_bias are indices of hv@Data
-sampling_bias_bootstrap <- function(name, hv, n = 10, points_per_resample = 'sample_size', verbose = TRUE, mu, sigma, cols_to_bias = 1:ncol(hv@Data)) {
+sampling_bias_bootstrap <- function(name, hv, n = 10, points_per_resample = 'sample_size', verbose = TRUE, mu = NULL, sigma = NULL, cols_to_bias = 1:ncol(hv@Data), weight_func = NULL) {
   dir.create(file.path('./Objects', name))
   if(verbose) {
     pb = progress_bar$new(total = n)
   }
   foreach(i = 1:n, .combine = c) %do% {
-    weights = dmvnorm(hv@Data[,cols_to_bias], mean = mu, sigma = diag(sigma))
+    if(is.null(weight_func)) {
+      if(length(mu) == 1) {
+        weights = dnorm(hv@Data[,cols_to_bias], mean = mu, sd = sqrt(sigma))
+      } else {
+        weights = dmvnorm(hv@Data[,cols_to_bias], mean = mu, sigma = diag(sigma))
+      }
+    } else {
+      weights = weight_func(hv@Data[,cols_to_bias])
+    }
     if(points_per_resample == 'sample_size') {
       points = apply(rmultinom(nrow(hv@Data), 1, weights) == 1, 2, which)
     } else {
@@ -109,7 +118,7 @@ resample <- function(name, hv, method, n = 10, points_per_resample = 'sample_siz
     stop("Invalid value for points_per_resample")
   } else if (seq[1] <= 0) {
     stop("Invalid input for seq")
-  } else if (length(mu) != length(sigma) | length(mu) != length(cols_to_bias)) {
+  } else if (method == 'biased bootstrap' & (length(mu) != length(sigma) | length(mu) != length(cols_to_bias))) {
     stop("mu, sigma, and cols_to_bias must have same length")
   }
   dir.create('./Objects', showWarnings = FALSE)

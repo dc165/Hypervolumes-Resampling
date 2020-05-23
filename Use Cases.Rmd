@@ -10,10 +10,11 @@ knitr::opts_chunk$set(echo = TRUE)
 ```
 
 ```{r}
-data(iris)
 source('resample.R')
-source('cross_validate.R')
 source('Funnels.R')
+source('Utils.R')
+data(iris)
+data(quercus)
 hv = hypervolume(iris[,c(1, 2)])
 ```
 
@@ -22,7 +23,7 @@ Using the hypervolume that models the first two columns of the iris data set, we
 ```{r}
 # Samples i rows from the data that generated hv for each i in seq, then generates a bootstrap on each of these i resamples and saves to file.
 # Runtime ~2hrs
-# hv_bootstrap_seq <- resample('hv_bootstrap_seq', hv, method = 'bootstrap seq', points_per_resample = "sample size", seq = seq(10, 150, length.out = 29))
+# hv_bootstrap_seq <- resample('hv_bootstrap_seq', hv, method = 'bootstrap seq', points_per_resample = "sample_size", seq = seq(10, 150, length.out = 29))
 # Here is the result of running the above code
 hv_bootstrap_seq <- "./Objects/hv_bootstrap_seq"
 ```
@@ -36,7 +37,7 @@ funnel(hv_bootstrap_seq, title = 'From resampled data', func = function(x) {mean
 funnel(hv_bootstrap_seq, title = 'From random points', func = function(x) {mean(x@RandomPoints[,1])}) + 
   geom_line(aes(y = mean(hv@Data[,1]))) + 
   ylim(5.25, 6.5) +
-  ylab(NULL)
+  ylab('Mean Sepal Length')
 ```
 
 Variance of a kernel density estimate is greater than sample variance as expected, but converges to sample variance for large n.  
@@ -52,32 +53,66 @@ funnel(hv_bootstrap_seq, title = 'Resampled volumes', func = get_volume) +
 ## Biased resample
 We consider the iris dataset and want to see how a biased sampling method affects the data.
 For example, we suspect flowers with larger and more visible petals are over counted.
-To simulate overcounting petals, we perform a biased bootstrap.
+To simulate overcounting plants with large petals, we perform a biased bootstrap.
 ```{r}
 # Hypervolume generated from iris data
 hv = hypervolume(iris[,1:4])
 # Weigh points with large values for petal length and petal width higher
-biased_path = resample("Petal bias", hv, method = "biased bootstrap", n = 1, mu = apply(hv@Data, 2, max)[c("Petal.Length", "Petal.Width")], sigma = apply(hv@Data, 2, sd)[c("Petal.Length", "Petal.Width")]*2, cols_to_bias = c("Petal.Length", "Petal.Width"))
+biased_path = resample("Petal bias", hv, method = "biased bootstrap", n = 1, mu = apply(hv@Data, 2, max)[c("Petal.Length", "Petal.Width")], sigma = apply(hv@Data, 2, var)[c("Petal.Length", "Petal.Width")]*2, cols_to_bias = c("Petal.Length", "Petal.Width"))
 biased_hv = readRDS(file.path(biased_path, "resample 1.rds"))
+# Combine resulting data in a dataframe
+dat = data.frame(rbind(hv@Data, biased_hv@Data))
+dat['Type'] = rep(c('original', 'biased'), each = 150)
 ```
+Effect on petal width and petal length
 ```{r, fig.show='hold', out.width='50%'}
-ggplot(data.frame(hv@Data), aes(y = ..density..)) + 
-  geom_histogram(aes(x = Petal.Width), bins = 20, fill = 'blue', alpha = 0.5) + 
-  geom_histogram(aes(x = Petal.Length), bins = 20, fill = 'red', alpha = 0.5) + 
-  ggtitle("Unbiased distribution of petal length and width")
-ggplot(data.frame(biased_hv@Data), aes(y = ..density..)) + 
-  geom_histogram(aes(x = Petal.Width), bins = 20, fill = 'blue', alpha = 0.5) + 
-  geom_histogram(aes(x = Petal.Length), bins = 20, fill = 'red', alpha = 0.5) + 
-  ggtitle("Biased distribution of petal length and width")
+ggplot(dat, aes(y = ..density..)) + geom_histogram(aes(x = Petal.Width, fill = Type), bins = 20) + 
+  facet_wrap(~Type) + 
+  ggtitle("Distribution of Petal Width", "Biased resample vs Original sample")
+ggplot(dat, aes(y = ..density..)) + geom_histogram(aes(x = Petal.Length, fill = Type), bins = 20) + 
+  facet_wrap(~Type) + 
+  ggtitle("Distribution of Petal Length", "Biased resample vs Original sample")
 ```
+
 Effect on sepal width and sepal length
 ```{r, fig.show='hold', out.width='50%'}
-ggplot(data.frame(hv@Data), aes(y = ..density..)) + 
-  geom_histogram(aes(x = Sepal.Width), bins = 20, fill = 'blue', alpha = 0.5) + 
-  geom_histogram(aes(x = Sepal.Length), bins = 20, fill = 'red', alpha = 0.5) + 
-  ggtitle("Unbiased distribution of sepal length and width")
-ggplot(data.frame(biased_hv@Data), aes(y = ..density..)) + 
-  geom_histogram(aes(x = Sepal.Width), bins = 20, fill = 'blue', alpha = 0.5) + 
-  geom_histogram(aes(x = Sepal.Length), bins = 20, fill = 'red', alpha = 0.5) + 
-  ggtitle("Biased distribution of sepal length and width")
+ggplot(dat, aes(y = ..density..)) + geom_histogram(aes(x = Sepal.Width, fill = Type), bins = 20) + 
+  facet_wrap(~Type) + 
+  ggtitle("Distribution of Sepal Width", "Biased resample vs Original sample")
+ggplot(dat, aes(y = ..density..)) + geom_histogram(aes(x = Sepal.Length, fill = Type), bins = 20) + 
+  facet_wrap(~Type) + 
+  ggtitle("Distribution of Sepal Length", "Biased resample vs Original sample")
 ```
+## Tests on Quercus data
+```{r}
+hv_quercus = hypervolume(quercus[,c(2,3)])
+```
+```{r}
+# Runtime ~6hrs
+# quercus_bootstrap_seq <- resample('quercus_bootstrap_seq', hv_quercus, method = 'bootstrap seq', points_per_resample = "sample_size", seq = floor(seq(10, 3779, length.out = 30)))
+quercus_bootstrap_seq <- "./Objects/quercus_bootstrap_seq"
+```
+The funnel plot of volume shows that the sample volume is biased towards lower values. For some of the resamples, all resampled hypervolumes had smaller volume than the original sample.
+```{r}
+funnel(quercus_bootstrap_seq, title = 'Resampled volumes of Quercus', func = get_volume) + 
+  geom_line(aes(y = get_volume(hv_quercus)))
+```
+When performing biased resampling, the volume becomes significantly smaller if biasing towards a single point.
+```{r, fig.show='hold', out.width='50%'}
+# bias towards mean latitude
+mu = mean(hv_quercus@Data[,2])
+sigma = 3*var(hv_quercus@Data[,2])
+# Biased bootstrap on hv_quercus
+# Runtime ~ 20min
+# center_bias = resample('quercus bias', hv_quercus, method = 'biased bootstrap', mu = mu, sigma = sigma, cols_to_bias = 2)
+biased_quercus_hvs = to_hv_list("./Objects/quercus bias")
+weight_func = function(x) {dnorm(x, mu, sqrt(sigma))}
+ggplot(quercus, aes(x = Longitude)) + stat_function(fun = weight_func) + 
+  geom_rug() +
+  ggtitle('Weights biased towards mean longitude') +
+  ylab('resampling weights')
+ggplot(data.frame(volume = get_volume(biased_quercus_hvs)), aes(x = volume)) + 
+  geom_histogram(bins = 5) +
+  ggtitle('Volumes of hypervolumes biased towards mean longitude', 'Original volume: 106.8')
+```
+
