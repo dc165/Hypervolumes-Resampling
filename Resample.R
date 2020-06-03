@@ -2,15 +2,27 @@ library(hypervolume)
 library(foreach)
 library(progress)
 library(mvtnorm)
+library(doParallel)
 source('Utils.R')
 
 # take a sample of points_per_sample points each iteration to get n resampled hypervolumes
-bootstrap <- function(name, hv, n = 10, points_per_resample = 'sample_size', verbose = TRUE) {
+bootstrap <- function(name, hv, n = 10, points_per_resample = 'sample_size', cores = 1, verbose = TRUE) {
+  exists_cluster = TRUE
+  if(cores > 1 & getDoParWorkers() == 1) {
+    cl = makeCluster(cores)
+    clusterEvalQ(cl, {
+      library(hypervolume)
+      library(foreach)
+      source('Utils.R')
+    })
+    registerDoParallel(cl)
+    exists_cluster = FALSE
+  }
   dir.create(file.path('./Objects', name))
   if(verbose) {
     pb = progress_bar$new(total = n)
   }
-  foreach(i = 1:n, .combine = c) %do% {
+  foreach(i = 1:n, .combine = c) %dopar% {
     if(points_per_resample == 'sample_size') {
       sample_dat = hv@Data[sample(1:nrow(hv@Data), nrow(hv@Data), replace = TRUE),]
     } else {
@@ -23,18 +35,37 @@ bootstrap <- function(name, hv, n = 10, points_per_resample = 'sample_size', ver
       pb$tick()
     }
   }
+  if(!exists_cluster) {
+    stopCluster(cl)
+    registerDoSEQ()
+  }
   return(file.path(getwd(), 'Objects', name))
 }
 
 # n bootstrap hypervolumes for each size in seq.
-bootstrap_seq <- function(name, hv, n = 10, points_per_resample = 'sample_size', seq = 3:nrow(hv@Data), verbose = TRUE) {
+bootstrap_seq <- function(name, hv, n = 10, points_per_resample = 'sample_size', seq = 3:nrow(hv@Data), cores = 1, verbose = TRUE) {
+  exists_cluster = TRUE
+  if(cores > 1 & getDoParWorkers() == 1) {
+    cl = makeCluster(cores)
+    clusterEvalQ(cl, {
+      library(hypervolume)
+      library(foreach)
+      source('Utils.R')
+    })
+    registerDoParallel(cl)
+    exists_cluster = FALSE
+  }
   dir.create(file.path('./Objects', name))
   foreach(i = seq) %do% {
     subdir = paste('sample size', as.character(i))
     dir.create(file.path('./Objects', name, subdir))
     h = copy_param_hypervolume(hv, hv@Data[sample(1:nrow(hv@Data), i, replace = TRUE),], name = paste("resample", as.character(i)))
-    bootstrap(file.path(name, subdir), h, n, points_per_resample, verbose)
+    bootstrap(file.path(name, subdir), h, n, points_per_resample, verbose = verbose)
     saveRDS(h, file.path('./Objects', name, subdir, 'original.rds'))
+  }
+  if(!exists_cluster) {
+    stopCluster(cl)
+    registerDoSEQ()
   }
   return(file.path(getwd(), 'Objects', name))
 }
@@ -77,12 +108,24 @@ k_split <- function(name, hv, k = 5, verbose = TRUE) {
 # sigma has same number of dimensions as cols_to_bias, strength of bias in each dimension
 # Use mu and sigma as parameters of multivariate normal distribution or input own weight function that takes in a matrix argument
 # cols_to_bias are indices of hv@Data
-sampling_bias_bootstrap <- function(name, hv, n = 10, points_per_resample = 'sample_size', verbose = TRUE, mu = NULL, sigma = NULL, cols_to_bias = 1:ncol(hv@Data), weight_func = NULL) {
+sampling_bias_bootstrap <- function(name, hv, n = 10, points_per_resample = 'sample_size', cores = 1, verbose = TRUE, mu = NULL, sigma = NULL, cols_to_bias = 1:ncol(hv@Data), weight_func = NULL) {
+  exists_cluster = TRUE
+  if(cores > 1 & getDoParWorkers() == 1) {
+    cl = makeCluster(cores)
+    clusterEvalQ(cl, {
+      library(hypervolume)
+      library(foreach)
+      library(mvtnorm)
+      source('Utils.R')
+    })
+    registerDoParallel(cl)
+    exists_cluster = FALSE
+  }
   dir.create(file.path('./Objects', name))
   if(verbose) {
     pb = progress_bar$new(total = n)
   }
-  foreach(i = 1:n, .combine = c) %do% {
+  foreach(i = 1:n, .combine = c) %dopar% {
     if(is.null(weight_func)) {
       if(length(mu) == 1) {
         weights = dnorm(hv@Data[,cols_to_bias], mean = mu, sd = sqrt(sigma))
@@ -105,13 +148,17 @@ sampling_bias_bootstrap <- function(name, hv, n = 10, points_per_resample = 'sam
       pb$tick()
     }
   }
+  if(!exists_cluster) {
+    stopCluster(cl)
+    registerDoSEQ()
+  }
   return(file.path(getwd(), 'Objects', name))
 }
 
 # Single interface for resampling
 # Creates Objects directory in current working directory
 # Returns absolute path to file with hypervolume files
-resample <- function(name, hv, method, n = 10, points_per_resample = 'sample_size', seq = 3:nrow(hv@Data), verbose = TRUE, mu = NULL, sigma = NULL, cols_to_bias = 1:ncol(hv@Data)) {
+resample <- function(name, hv, method, n = 10, points_per_resample = 'sample_size', seq = 3:nrow(hv@Data), cores = 1, verbose = TRUE, mu = NULL, sigma = NULL, cols_to_bias = 1:ncol(hv@Data)) {
   if (n <= 0) {
     stop("Invalid value for n")
   } else if (points_per_resample != "sample size" & points_per_resample <= 0) {
@@ -120,13 +167,15 @@ resample <- function(name, hv, method, n = 10, points_per_resample = 'sample_siz
     stop("Invalid input for seq")
   } else if (method == 'biased bootstrap' & (length(mu) != length(sigma) | length(mu) != length(cols_to_bias))) {
     stop("mu, sigma, and cols_to_bias must have same length")
+  } else if (cores < 1) {
+    stop("cores must be greater than or equal to 1")
   }
   dir.create('./Objects', showWarnings = FALSE)
   if (method == 'bootstrap') {
-    return(bootstrap(name, hv, n, points_per_resample, verbose))
+    return(bootstrap(name, hv, n, points_per_resample, cores, verbose))
   } else if (method == 'bootstrap seq') {
-    return(bootstrap_seq(name, hv, n, points_per_resample, seq, verbose))
+    return(bootstrap_seq(name, hv, n, points_per_resample, seq, cores, verbose))
   } else if (method == 'biased bootstrap') {
-    return(sampling_bias_bootstrap(name, hv, n, points_per_resample, verbose, mu, sigma, cols_to_bias))
+    return(sampling_bias_bootstrap(name, hv, n, points_per_resample, cores, verbose, mu, sigma, cols_to_bias))
   }
 }

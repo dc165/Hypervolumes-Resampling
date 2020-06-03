@@ -11,6 +11,10 @@ source('resample.R')
 
     ## Loading required package: rgl
 
+    ## Loading required package: iterators
+
+    ## Loading required package: parallel
+
 ``` r
 source('Funnels.R')
 ```
@@ -57,7 +61,7 @@ hv = hypervolume(iris[,c(1, 2)])
     ## Ball query... 
     ## 
     ## done.
-    ## Requested probability quantile 0.950000, obtained 0.949768 - setting threshold value 0.000177.
+    ## Requested probability quantile 0.950000, obtained 0.948781 - setting threshold value 0.000180.
     ##  For a closer match, you can increase num.thresholds in hypervolume_threshold.
 
 ## Generate Hypervolume and Resample
@@ -153,7 +157,7 @@ hv = hypervolume(iris[,1:4])
     ## Ball query... 
     ## 
     ## done.
-    ## Requested probability quantile 0.950000, obtained 0.946993 - setting threshold value 0.000019.
+    ## Requested probability quantile 0.950000, obtained 0.946054 - setting threshold value 0.000019.
     ##  For a closer match, you can increase num.thresholds in hypervolume_threshold.
 
 ``` r
@@ -163,6 +167,8 @@ biased_path = resample("Petal bias", hv, method = "biased bootstrap", n = 1, mu 
 
     ## Warning in dir.create(file.path("./Objects", name)): '.\Objects\Petal bias'
     ## already exists
+
+    ## Warning: executing %dopar% sequentially: no parallel backend registered
 
 ``` r
 biased_hv = readRDS(file.path(biased_path, "resample 1.rds"))
@@ -210,7 +216,7 @@ hv_quercus = hypervolume(quercus[,c(2,3)])
     ## Ball query... 
     ## 
     ## done.
-    ## Requested probability quantile 0.950000, obtained 0.941495 - setting threshold value 0.000000.
+    ## Requested probability quantile 0.950000, obtained 0.940883 - setting threshold value 0.000000.
     ##  For a closer match, you can increase num.thresholds in hypervolume_threshold.
 
 ``` r
@@ -252,3 +258,125 @@ ggplot(data.frame(volume = get_volume(biased_quercus_hvs)), aes(x = volume)) +
 ```
 
 <img src="Use-Cases_files/figure-gfm/unnamed-chunk-11-1.png" width="50%" /><img src="Use-Cases_files/figure-gfm/unnamed-chunk-11-2.png" width="50%" />
+\#\# Computing in parallel
+
+``` r
+hv = hypervolume(iris[,1:2])
+```
+
+    ## 
+    ## Building tree... 
+    ## done.
+    ## Ball query... 
+    ## 
+    ## done.
+    ## 
+    ## Building tree... 
+    ## done.
+    ## Ball query... 
+    ## 
+    ## done.
+    ## 
+    ## Building tree... 
+    ## done.
+    ## Ball query... 
+    ## 
+    ## done.
+    ## 
+    ## Building tree... 
+    ## done.
+    ## Ball query... 
+    ## 
+    ## done.
+    ## Requested probability quantile 0.950000, obtained 0.948797 - setting threshold value 0.000180.
+    ##  For a closer match, you can increase num.thresholds in hypervolume_threshold.
+
+``` r
+system.time({
+  resample("non-parallel test", hv, "bootstrap", n = 30)
+})
+```
+
+    ## Warning in dir.create(file.path("./Objects", name)): '.\Objects\non-parallel
+    ## test' already exists
+
+    ##    user  system elapsed 
+    ##  134.07    0.72  137.00
+
+``` r
+system.time({
+  resample("parallel test", hv, "bootstrap", n = 30, cores = 4)
+})
+```
+
+    ## Warning in dir.create(file.path("./Objects", name)): '.\Objects\parallel test'
+    ## already exists
+
+    ##    user  system elapsed 
+    ##    0.11    0.08   96.13
+
+``` r
+system.time({
+  resample("non-parallel bias test", hv, "biased bootstrap", n = 30, mu = c(3, 3), sigma = c(1, 1))
+})
+```
+
+    ## Warning in dir.create(file.path("./Objects", name)): '.\Objects\non-parallel
+    ## bias test' already exists
+
+    ##    user  system elapsed 
+    ##  112.82    0.87  114.64
+
+``` r
+system.time({
+  resample("parallel bias test", hv, "biased bootstrap", n = 30, mu = c(3, 3), sigma = c(1, 1), cores = 4)
+})
+```
+
+    ## Warning in dir.create(file.path("./Objects", name)): '.\Objects\parallel bias
+    ## test' already exists
+
+    ##    user  system elapsed 
+    ##    0.16    0.03   75.07
+
+``` r
+system.time({
+  resample("non-parallel bias test", hv, "bootstrap seq", n = 30, seq = c(50, 100, 150))
+})
+```
+
+    ## Warning in dir.create(file.path("./Objects", name)): '.\Objects\non-parallel
+    ## bias test' already exists
+
+    ## Warning in dir.create(file.path("./Objects", name)): '.\Objects\non-parallel
+    ## bias test\sample size 50' already exists
+
+    ## Warning in dir.create(file.path("./Objects", name)): '.\Objects\non-parallel
+    ## bias test\sample size 100' already exists
+
+    ## Warning in dir.create(file.path("./Objects", name)): '.\Objects\non-parallel
+    ## bias test\sample size 150' already exists
+
+    ##    user  system elapsed 
+    ##  219.61    0.99  224.33
+
+``` r
+system.time({
+  resample("parallel bias test", hv, "bootstrap seq", n = 30, seq = c(50, 100, 150), cores = 4)
+})
+```
+
+    ## Warning in dir.create(file.path("./Objects", name)): '.\Objects\parallel bias
+    ## test' already exists
+
+    ## Warning in dir.create(file.path("./Objects", name)): '.\Objects\parallel bias
+    ## test\sample size 50' already exists
+
+    ## Warning in dir.create(file.path("./Objects", name)): '.\Objects\parallel bias
+    ## test\sample size 100' already exists
+
+    ## Warning in dir.create(file.path("./Objects", name)): '.\Objects\parallel bias
+    ## test\sample size 150' already exists
+
+    ##    user  system elapsed 
+    ##    9.25    0.20  135.12

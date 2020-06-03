@@ -24,25 +24,12 @@ copy_param_hypervolume <- function(hv, data, name = NULL) {
   }
 }
 
-# Empirical culmulative distribution function of x
-ecdf <- function(x, dat, axis) {
-  count = 0
-  foreach(i = dat[,axis], .combine = c) %do% {
-    if (i <= x) {
-      count = count + 1
-    }
+# Convert file containing hypervolumes to hypervolume list
+to_hv_list <- function(path) {
+  hvs = new("HypervolumeList")
+  hvs@HVList = foreach(file = list.files(path), .combine = c) %do% {
+    readRDS(file.path(path, file))
   }
-  return(count/nrow(dat))
+  return(hvs)
 }
 
-# Multivariate Empirical distribution function of x
-joint_ecdf <- function(x, hv) {
-  count = 0
-  dim = ncol(hv@Data)
-  for (i in 1:nrow(hv@Data)) {
-    if (sum(hv@Data[i,] <= x) == dim) {
-      count = count + 1
-    }
-  }
-  return(count/nrow(hv@Data))
-}
