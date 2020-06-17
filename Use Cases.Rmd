@@ -115,6 +115,7 @@ ggplot(data.frame(volume = get_volume(biased_quercus_hvs)), aes(x = volume)) +
   geom_histogram(bins = 5) +
   ggtitle('Volumes of hypervolumes biased towards mean longitude', 'Original volume: 106.8')
 ```
+
 ## Computing in parallel
 ```{r}
 hv = hypervolume(iris[,1:2])
@@ -146,6 +147,6 @@ system.time({
 ```
 ```{r}
 system.time({
-  resample("parallel bias test", hv, "bootstrap seq", n = 30, seq = c(50, 100, 150), cores = 4)
+  resample("parallel bias test", hv, "bootstrap seq", n = 30, seq = c(50, 100, 150), cores = 10)
 })
 ```

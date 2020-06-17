@@ -1,0 +1,137 @@
+---
+title: "Biases"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, include=FALSE}
+cores = 20
+cl = makeCluster(cores)
+clusterEvalQ(cl, {
+  library(hypervolume)
+  library(foreach)
+  source('Utils.R')
+})
+registerDoParallel(cl)
+```
+
+```{r}
+boot_path = resample("volume bias testing", hv, "bootstrap", n = 500)
+```
+
+```{r}
+full_vols = foreach(i = 1:500, .combine = c) %dopar% {
+  h = hypervolume(iris[,1:2])
+  get_volume(h)
+}
+
+boot_vols = foreach(i = list.files(boot_path), .combine = c) %dopar% {
+  h = readRDS(file.path(boot_path, i))
+  get_volume(h)
+}
+```
+```{r}
+hist(full_vols, 15)
+```
+```{r}
+hist(boot_vols, 15)
+```
+```{r}
+t.test(full_vols, boot_vols)
+```
+```{r}
+reduced_boot_path = resample("reduced points volume bias testing", hv, "bootstrap", n = 500, points_per_resample = 100)
+reduced_boot_vols = foreach(i = list.files(reduced_boot_path), .combine = c) %dopar% {
+  h = readRDS(file.path(reduced_boot_path, i))
+  get_volume(h)
+}
+```
+
+```{r}
+hist(reduced_boot_vols, 15)
+```
+```{r}
+t.test(reduced_boot_vols, boot_vols)
+```
+
+```{r}
+manual_boot_path = resample("manual volume bias testing", hv, "bootstrap", n = 500, points_per_resample = 150)
+manual_boot_vols = foreach(i = list.files(manual_boot_path), .combine = c) %dopar% {
+  h = readRDS(file.path(manual_boot_path, i))
+  get_volume(h)
+}
+```
+```{r}
+t.test(manual_boot_vols, boot_vols)
+```
+```{r}
+model_bootstrap <- function(name, hv, n = 10, points_per_resample = 'sample_size', cores = 1, verbose = TRUE) {
+  exists_cluster = TRUE
+  if(cores > 1 & getDoParWorkers() == 1) {
+    cl = makeCluster(cores)
+    clusterEvalQ(cl, {
+      library(hypervolume)
+      library(foreach)
+      source('Utils.R')
+    })
+    registerDoParallel(cl)
+    exists_cluster = FALSE
+  }
+  dir.create(file.path('./Objects', name))
+  if(verbose) {
+    pb = progress_bar$new(total = n)
+  }
+  foreach(i = 1:n, .combine = c) %dopar% {
+    if(points_per_resample == 'sample_size') {
+      sample_dat = hv@RandomPoints[sample(1:nrow(hv@RandomPoints), nrow(hv@Data), replace = TRUE),]
+    } else {
+      sample_dat = hv@RandomPoints[sample(1:nrow(hv@RandomPoints), points_per_resample, replace = TRUE),]
+    }
+    h = copy_param_hypervolume(hv, sample_dat, name = paste("resample", as.character(i)))
+    path = paste0(h@Name, '.rds')
+    saveRDS(h, file.path('./Objects', name, path))
+    if(verbose) {
+      pb$tick()
+    }
+  }
+  if(!exists_cluster) {
+    stopCluster(cl)
+    registerDoSEQ()
+  }
+  return(file.path(getwd(), 'Objects', name))
+}
+
+```
+
+```{r}
+model_path = model_bootstrap("resample from random points", hv, n = 500)
+```
+```{r}
+model_vols = foreach(i = list.files(model_path), .combine = c) %dopar% {
+  h = readRDS(file.path(model_path, i))
+  get_volume(h)
+}
+```
+
+```{r}
+t.test(full_vols, model_vols)
+```
+```{r}
+alt_full_vols = foreach(i = 1:500, .combine = c) %dopar% {
+  h = hypervolume(iris[,1:2], kde.bandwidth = estimate_bandwidth(iris[,1:2], "cross-validation"))
+  get_volume(h)
+}
+```
+```{r}
+t.test(alt_full_vols, full_vols)
+```
+```{r}
+plot(hypervolume(iris[,1:2], kde.bandwidth = estimate_bandwidth(iris[,1:2], "cross-validation")))
+```
+```{r}
+plot(hv)
+```
+

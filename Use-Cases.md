@@ -61,14 +61,13 @@ hv = hypervolume(iris[,c(1, 2)])
     ## Ball query... 
     ## 
     ## done.
-    ## Requested probability quantile 0.950000, obtained 0.948781 - setting threshold value 0.000180.
+    ## Requested probability quantile 0.950000, obtained 0.949989 - setting threshold value 0.000180.
     ##  For a closer match, you can increase num.thresholds in hypervolume_threshold.
 
 ## Generate Hypervolume and Resample
 
 Using the hypervolume that models the first two columns of the iris data
-set, we generate a sequence of
-bootstraps.
+set, we generate a sequence of bootstraps.
 
 ``` r
 # Samples i rows from the data that generated hv for each i in seq, then generates a bootstrap on each of these i resamples and saves to file.
@@ -80,8 +79,7 @@ hv_bootstrap_seq <- "./Objects/hv_bootstrap_seq"
 
 By creating funnel plots using the bootstrap sequence, we can see that
 our mean resampled data and mean random points both converge to the mean
-of our original
-sample.
+of our original sample.
 
 ``` r
 funnel(hv_bootstrap_seq, title = 'From resampled data', func = function(x) {mean(x@Data[,1])}) + 
@@ -99,8 +97,7 @@ funnel(hv_bootstrap_seq, title = 'From random points', func = function(x) {mean(
 Variance of a kernel density estimate is greater than sample variance as
 expected, but converges to sample variance for large n.  
 Bootstrapped volumes seem unbiased; however the 95% confidence interval
-is
-skewed.
+is skewed.
 
 ``` r
 funnel(hv_bootstrap_seq, title = 'Resampled variances from random points', func = function(x) {var(x@RandomPoints[,1])}) + 
@@ -157,7 +154,7 @@ hv = hypervolume(iris[,1:4])
     ## Ball query... 
     ## 
     ## done.
-    ## Requested probability quantile 0.950000, obtained 0.946054 - setting threshold value 0.000019.
+    ## Requested probability quantile 0.950000, obtained 0.948062 - setting threshold value 0.000019.
     ##  For a closer match, you can increase num.thresholds in hypervolume_threshold.
 
 ``` r
@@ -177,8 +174,7 @@ dat = data.frame(rbind(hv@Data, biased_hv@Data))
 dat['Type'] = rep(c('original', 'biased'), each = 150)
 ```
 
-Effect on petal width and petal
-length
+Effect on petal width and petal length
 
 ``` r
 ggplot(dat, aes(y = ..density..)) + geom_histogram(aes(x = Petal.Width, fill = Type), bins = 20) + 
@@ -191,8 +187,7 @@ ggplot(dat, aes(y = ..density..)) + geom_histogram(aes(x = Petal.Length, fill = 
 
 <img src="Use-Cases_files/figure-gfm/unnamed-chunk-6-1.png" width="50%" /><img src="Use-Cases_files/figure-gfm/unnamed-chunk-6-2.png" width="50%" />
 
-Effect on sepal width and sepal
-length
+Effect on sepal width and sepal length
 
 ``` r
 ggplot(dat, aes(y = ..density..)) + geom_histogram(aes(x = Sepal.Width, fill = Type), bins = 20) + 
@@ -216,7 +211,7 @@ hv_quercus = hypervolume(quercus[,c(2,3)])
     ## Ball query... 
     ## 
     ## done.
-    ## Requested probability quantile 0.950000, obtained 0.940883 - setting threshold value 0.000000.
+    ## Requested probability quantile 0.950000, obtained 0.940446 - setting threshold value 0.000000.
     ##  For a closer match, you can increase num.thresholds in hypervolume_threshold.
 
 ``` r
@@ -227,8 +222,7 @@ quercus_bootstrap_seq <- "./Objects/quercus_bootstrap_seq"
 
 The funnel plot of volume shows that the sample volume is biased towards
 lower values. For some of the resamples, all resampled hypervolumes had
-smaller volume than the original
-sample.
+smaller volume than the original sample.
 
 ``` r
 funnel(quercus_bootstrap_seq, title = 'Resampled volumes of Quercus', func = get_volume) + 
@@ -258,7 +252,8 @@ ggplot(data.frame(volume = get_volume(biased_quercus_hvs)), aes(x = volume)) +
 ```
 
 <img src="Use-Cases_files/figure-gfm/unnamed-chunk-11-1.png" width="50%" /><img src="Use-Cases_files/figure-gfm/unnamed-chunk-11-2.png" width="50%" />
-\#\# Computing in parallel
+
+## Computing in parallel
 
 ``` r
 hv = hypervolume(iris[,1:2])
@@ -288,7 +283,7 @@ hv = hypervolume(iris[,1:2])
     ## Ball query... 
     ## 
     ## done.
-    ## Requested probability quantile 0.950000, obtained 0.948797 - setting threshold value 0.000180.
+    ## Requested probability quantile 0.950000, obtained 0.949632 - setting threshold value 0.000180.
     ##  For a closer match, you can increase num.thresholds in hypervolume_threshold.
 
 ``` r
@@ -301,7 +296,7 @@ system.time({
     ## test' already exists
 
     ##    user  system elapsed 
-    ##  134.07    0.72  137.00
+    ##   82.56    0.27   82.75
 
 ``` r
 system.time({
@@ -313,7 +308,7 @@ system.time({
     ## already exists
 
     ##    user  system elapsed 
-    ##    0.11    0.08   96.13
+    ##    0.06    0.08   28.60
 
 ``` r
 system.time({
@@ -325,7 +320,7 @@ system.time({
     ## bias test' already exists
 
     ##    user  system elapsed 
-    ##  112.82    0.87  114.64
+    ##   76.55    0.34   76.82
 
 ``` r
 system.time({
@@ -337,7 +332,7 @@ system.time({
     ## test' already exists
 
     ##    user  system elapsed 
-    ##    0.16    0.03   75.07
+    ##    0.06    0.02   26.70
 
 ``` r
 system.time({
@@ -348,35 +343,35 @@ system.time({
     ## Warning in dir.create(file.path("./Objects", name)): '.\Objects\non-parallel
     ## bias test' already exists
 
+    ## Warning in dir.create(file.path("./Objects", name, subdir)): '.\Objects\non-
+    ## parallel bias test\sample size 50' already exists
+
     ## Warning in dir.create(file.path("./Objects", name)): '.\Objects\non-parallel
     ## bias test\sample size 50' already exists
 
+    ## Warning in dir.create(file.path("./Objects", name, subdir)): '.\Objects\non-
+    ## parallel bias test\sample size 100' already exists
+
     ## Warning in dir.create(file.path("./Objects", name)): '.\Objects\non-parallel
     ## bias test\sample size 100' already exists
+
+    ## Warning in dir.create(file.path("./Objects", name, subdir)): '.\Objects\non-
+    ## parallel bias test\sample size 150' already exists
 
     ## Warning in dir.create(file.path("./Objects", name)): '.\Objects\non-parallel
     ## bias test\sample size 150' already exists
 
     ##    user  system elapsed 
-    ##  219.61    0.99  224.33
+    ##  145.14    0.53  145.53
 
 ``` r
 system.time({
-  resample("parallel bias test", hv, "bootstrap seq", n = 30, seq = c(50, 100, 150), cores = 4)
+  resample("parallel bias test", hv, "bootstrap seq", n = 30, seq = c(50, 100, 150), cores = 10)
 })
 ```
 
     ## Warning in dir.create(file.path("./Objects", name)): '.\Objects\parallel bias
     ## test' already exists
 
-    ## Warning in dir.create(file.path("./Objects", name)): '.\Objects\parallel bias
-    ## test\sample size 50' already exists
-
-    ## Warning in dir.create(file.path("./Objects", name)): '.\Objects\parallel bias
-    ## test\sample size 100' already exists
-
-    ## Warning in dir.create(file.path("./Objects", name)): '.\Objects\parallel bias
-    ## test\sample size 150' already exists
-
     ##    user  system elapsed 
-    ##    9.25    0.20  135.12
+    ##    0.04    0.15   94.03

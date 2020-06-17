@@ -51,17 +51,17 @@ bootstrap_seq <- function(name, hv, n = 10, points_per_resample = 'sample_size',
       library(hypervolume)
       library(foreach)
       source('Utils.R')
+      source('Resample.R')
     })
     registerDoParallel(cl)
     exists_cluster = FALSE
   }
   dir.create(file.path('./Objects', name))
-  foreach(i = seq) %do% {
+  foreach(i = seq) %dopar% {
     subdir = paste('sample size', as.character(i))
     dir.create(file.path('./Objects', name, subdir))
     h = copy_param_hypervolume(hv, hv@Data[sample(1:nrow(hv@Data), i, replace = TRUE),], name = paste("resample", as.character(i)))
     bootstrap(file.path(name, subdir), h, n, points_per_resample, verbose = verbose)
-    saveRDS(h, file.path('./Objects', name, subdir, 'original.rds'))
   }
   if(!exists_cluster) {
     stopCluster(cl)

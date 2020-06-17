@@ -13,7 +13,7 @@ funnel <- function(input_path, title = NULL, func = get_volume, CI = .95, as_tab
       func(readRDS(file.path(input_path, i, j)))
     }
     upperq = c(upperq, quantile(dat, .5 + CI/2))
-    sample_mean = c(sample_mean, func(readRDS(file.path(input_path, i, 'original.rds'))))
+    sample_mean = c(sample_mean, mean(dat))
     lowerq = c(lowerq, quantile(dat, (1 - CI)/2))
     n = c(n, as.numeric(strsplit(i, split = " ")[[1]][3]))
   }
