@@ -27,7 +27,10 @@ full_vols = foreach(i = 1:500, .combine = c) %dopar% {
   h = hypervolume(iris[,1:2])
   get_volume(h)
 }
+```
 
+
+```{r}
 boot_vols = foreach(i = list.files(boot_path), .combine = c) %dopar% {
   h = readRDS(file.path(boot_path, i))
   get_volume(h)
@@ -133,5 +136,17 @@ plot(hypervolume(iris[,1:2], kde.bandwidth = estimate_bandwidth(iris[,1:2], "cro
 ```
 ```{r}
 plot(hv)
+```
+```{r}
+intersections <- foreach(i = 1:30, .combine = c) %:%
+  foreach(j = 31:60, .combine = c) %dopar% {
+    h1 = readRDS(file.path(boot_path, list.files(boot_path)[i]))
+    h2 = readRDS(file.path(boot_path, list.files(boot_path)[j]))
+    get_volume(hypervolume_set(h1, h2, check.memory = FALSE))[3]
+  }
+```
+
+```{r}
+hist(intersections)
 ```
 
