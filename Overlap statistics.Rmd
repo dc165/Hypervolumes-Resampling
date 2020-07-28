@@ -7,11 +7,14 @@ output: github_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-```{r}
+```{r, results='hide'}
 library(ggplot2)
 library(hypervolume)
 library(doParallel)
+source("Resample.R")
+source("Overlap.R")
 ```
+
 ## Combined data from hypervolumes drawn from same distribution approximate distribution of original population  
 Drawn from normal distribution  
 ```{r}
@@ -21,14 +24,14 @@ func = function(x) {dnorm(x)}
 ggplot(data.frame(sample1, sample2, x = seq(-3, 3, length.out = 150))) + 
   geom_histogram(aes(x = sample1, y = ..density.., fill = "red", alpha = 0.5), bins = 20) + 
   geom_histogram(aes(x = sample2, y = ..density.., fill = "blue", alpha = 0.5), bins = 20) +
-  stat_function(aes(x = x), fun = func)
+  stat_function(fun = func)
 ```
 ```{r}
 ggplot(data.frame(samples = c(sample1, sample2), x = seq(-3, 3, length.out = 300))) +
   geom_histogram(aes(x = samples, y = ..density.., alpha = 0.5), bins = 30) +
   stat_function(fun = func)
 ```
-Drawn from sample data
+Combined samples from sample data also approximate the distribution of original data  
 ```{r}
 data("quercus")
 qsample1 = quercus[sample(1:nrow(quercus), 150),]
@@ -37,12 +40,12 @@ combined_sample = rbind(qsample1, qsample2)
 ggplot(data = combined_sample) + geom_histogram(aes(x = Latitude, y = ..density..), fill = "red", alpha = 0.5) + geom_histogram(data = quercus, aes(x = Latitude, y = ..density..), fill = "blue", alpha = 0.5) + ggtitle("Red: combined samples \nBlue: original data")
 ```
 
-```{r}
+```{r, results='hide'}
 hv1 = hypervolume(qsample1[,2:3])
 hv2 = hypervolume(qsample2[,2:3])
 population_hat = hypervolume(combined_sample[,2:3])
 ```
-```{r}
+```{r, results='hide'}
 #null_path = resample("quercus_150_null", population_hat, "bootstrap", n = 500, points_per_resample = 150, cores = 20)
 null_path = "C:/Users/14842/Desktop/Hypervolumes-Resampling/Objects/quercus_150_null"
 
@@ -50,7 +53,7 @@ null_path = "C:/Users/14842/Desktop/Hypervolumes-Resampling/Objects/quercus_150_
 observed = hypervolume_overlap_statistics(hypervolume_set(hv1, hv2, check.memory = FALSE))
 ```
 
-```{r, include=FALSE}
+```{r, results="hide"}
 # optional code block for generating null distribution faster
 cores = 20
 cl = makeCluster(cores)
@@ -62,7 +65,7 @@ clusterEvalQ(cl, {
 registerDoParallel(cl)
 ```
 
-```{r}
+```{r, results='hide'}
 # Generate null distribution of statitics
 null = foreach(i = 1:250, .combine = rbind) %:%
   foreach(j = 251:500, .combine = rbind) %dopar% {
@@ -97,12 +100,12 @@ setosa and versicolor clearly do not share the same distribution
 data(iris)
 ggplot(iris, aes(x = Sepal.Length, y = Sepal.Width, color = Species)) + geom_point()
 ```
-```{r}
+```{r, results='hide'}
 hv_setosa = hypervolume(iris[iris$Species == "setosa", 1:2])
 hv_versicolor = hypervolume(iris[iris$Species == "versicolor", 1:2])
 hv_combine = hypervolume(iris[iris$Species == "versicolor" | iris$Species == "setosa", 1:2])
 ```
-```{r}
+```{r, results='hide'}
 #power_test_path = resample("power test bootstrap", hv_combine, "bootstrap", n = 200, points_per_resample = 50)
 power_test_path = "C:/Users/14842/Desktop/Hypervolumes-Resampling/Objects/power test bootstrap"
 
@@ -110,7 +113,7 @@ power_test_path = "C:/Users/14842/Desktop/Hypervolumes-Resampling/Objects/power 
 observed_iris_stats = hypervolume_overlap_statistics(hypervolume_set(hv_setosa, hv_versicolor, check.memory = FALSE))
 ```
 ```{r}
-# Generate null distribution of statitics
+# Generate null distribution of statistics
 null_iris = foreach(i = 1:100, .combine = rbind) %:%
   foreach(j = 101:200, .combine = rbind) %dopar% {
     h1 = readRDS(file.path(power_test_path, list.files(power_test_path)[i]))
@@ -137,9 +140,68 @@ ggplot(data.frame(null_iris), aes(x = frac_unique_2, y = ..density..)) +
   geom_point(aes(x = observed_iris_stats["frac_unique_2"], y = 0), color = "red") + 
   ggtitle("Distribution of fraction of Hypervolume 2 that is unique")
 ```
+
+## Permutations  
+Use quercus to permute  
+```{r}
+#perm_path = permute("Quercus_perm_150", hv1, hv2, n = 200, cores = 20)
+perm_path = "C:/Users/14842/Desktop/Hypervolumes-Resampling/Objects/Quercus_perm_150"
+```
+
+```{r, include = FALSE}
+perm_null = foreach(i = list.files(perm_path), .combine = rbind) %dopar% {
+  h1 = readRDS(file.path(perm_path, i, "hv1.rds"))
+  h2 = readRDS(file.path(perm_path, i, "hv2.rds"))
+  hypervolume_overlap_statistics(hypervolume_set(h1, h2, check.memory = FALSE))
+}
+```
+
+Permutation tests a slightly different hypothesis but gives similar distribution as bootstrapping.  
+```{r}
+ggplot(data.frame(perm_null), aes(x = jaccard, y = ..density..)) +
+  geom_histogram(aes(x = jaccard, y = ..density..), data = data.frame(null), bins = 100, fill = "blue", alpha = 0.5) +
+  geom_histogram(bins = 30, fill = "red", alpha = 0.5) + 
+  geom_point(aes(x = observed["jaccard"], y = 0), color = "blue") + 
+  ggtitle("Distribution of jaccard index")
+ggplot(data.frame(perm_null), aes(x = sorensen, y = ..density..)) + 
+  geom_histogram(aes(x = sorensen, y = ..density..), data = data.frame(null), bins = 100, fill = "blue", alpha = 0.5) +
+  geom_histogram(bins = 30, fill = "red", alpha = 0.5) + 
+  geom_point(aes(x = observed["sorensen"], y = 0), color = "blue") + 
+  ggtitle("Distribution of sorensen index")
+ggplot(data.frame(perm_null), aes(x = frac_unique_1, y = ..density..)) + 
+  geom_histogram(aes(x = frac_unique_1, y = ..density..), data = data.frame(null), bins = 100, fill = "blue", alpha = 0.5) +
+  geom_histogram(bins = 30, fill = "red", alpha = 0.5) +
+  geom_point(aes(x = observed["frac_unique_1"], y = 0), color = "blue") + 
+  ggtitle("Distribution of fraction of Hypervolume 1 that is unique")
+ggplot(data.frame(perm_null), aes(x = frac_unique_2, y = ..density..)) + 
+  geom_histogram(aes(x = frac_unique_2, y = ..density..), data = data.frame(null), bins = 100, fill = "blue", alpha = 0.5) +
+  geom_histogram(bins = 30, fill = "red", alpha = 0.5) + 
+  geom_point(aes(x = observed["frac_unique_2"], y = 0), color = "blue") + 
+  ggtitle("Distribution of fraction of Hypervolume 2 that is unique")
+```
+
+## Results from overlap.test  
+overlap.test returns a list of results  
+    - $p-values: a list of p-values for each of the four statistics returned by hypervolume_overlap_statistics.  
+    - $plots: a list of plots for each statistic that show null distribution and value observed by hv1 and hv2.  
+    - $distribution: matrix of bootstrap or permutation results used to generate the plotted distribution  
+The method detects whether to generate distribution for a permutation or bootstrap test based on file structure of input path.
+```{r}
+results = overlap.test(hv1, hv2, null_path)
+p = results$p_values$jaccard
+print(paste("p-value for Jaccard index:", p))
+results$plots$jaccard
+```
+```{r}
+perm_results = overlap.test(hv1, hv2, perm_path, bins = 30)
+p = perm_results$p_values$jaccard
+print(paste("p-value for Jaccard index:", p))
+perm_results$plots$jaccard
+```
 ```{r}
 stopCluster(cl)
 stopImplicitCluster()
 registerDoSEQ()
 ```
+
 

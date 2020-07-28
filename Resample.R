@@ -179,3 +179,44 @@ resample <- function(name, hv, method, n = 10, points_per_resample = 'sample_siz
     return(sampling_bias_bootstrap(name, hv, n, points_per_resample, cores, verbose, mu, sigma, cols_to_bias))
   }
 }
+
+# Permutations of hypervolumes from two input hypervolumes
+permute <- function(name, hv1, hv2, n = 50, cores = 1, verbose = TRUE) {
+  exists_cluster = TRUE
+  if(cores > 1 & getDoParWorkers() == 1) {
+    cl = makeCluster(cores)
+    clusterEvalQ(cl, {
+      library(hypervolume)
+      source('Utils.R')
+    })
+    registerDoParallel(cl)
+    exists_cluster = FALSE
+  }
+  
+  dir.create(file.path('./Objects', name))
+  if(verbose) {
+    pb = progress_bar$new(total = n)
+  }
+  foreach(i = 1:n, .combine = c) %dopar% {
+    combined_data = rbind(hv1@Data, hv2@Data)
+    perm_idx = sample(1:nrow(combined_data), nrow(hv1@Data))
+    h1 = copy_param_hypervolume(hv1, combined_data[perm_idx,], name = "hv1")
+    h2 = copy_param_hypervolume(hv2, combined_data[-1 * perm_idx,], name = "hv2")
+    
+    subdir = file.path("./Objects", name, paste0("permutation", as.character(i)))
+    dir.create(subdir)
+    name1 = paste0(h1@Name, '.rds')
+    name2 = paste0(h2@Name, '.rds')
+    saveRDS(h1, file.path('./Objects', name, paste0("permutation", as.character(i)), name1))
+    saveRDS(h2, file.path('./Objects', name, paste0("permutation", as.character(i)), name2))
+    if(verbose) {
+      pb$tick()
+    }
+  }
+  
+  if(!exists_cluster) {
+    stopCluster(cl)
+    registerDoSEQ()
+  }
+  return(file.path(getwd(), 'Objects', name))
+}

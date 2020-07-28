@@ -1,0 +1,35 @@
+---
+title: "Power and Different sized hypervolumes"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(hypervolume)
+library(doParallel)
+data(quercus)
+```
+
+```{r, include=FALSE}
+# optional code block for generating null distribution faster
+cores = 20
+cl = makeCluster(cores)
+clusterEvalQ(cl, {
+  library(hypervolume)
+  library(foreach)
+  source('Utils.R')
+})
+registerDoParallel(cl)
+```
+
+```{r, include = FALSE}
+# Generating null distributions for samples of different size 150, and 300
+hv_150 = hypervolume(quercus[sample(1:nrow(quercus), 150), c(2, 3)])
+hv_300 = hypervolume(quercus[sample(1:nrow(quercus), 300), c(2, 3)])
+hv_combine = hypervolume(rbind(hv_150@Data, hv_300@Data))
+```
+
+```{r}
+
+```
+

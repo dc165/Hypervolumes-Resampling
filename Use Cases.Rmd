@@ -41,7 +41,8 @@ funnel(hv_bootstrap_seq, title = 'From random points', func = function(x) {mean(
 ```
 
 Variance of a kernel density estimate is greater than sample variance as expected, but converges to sample variance for large n.  
-Bootstrapped volumes seem unbiased; however the 95% confidence interval is skewed.
+It is hard to tell her, but bootstrapped volumes is biased and converges to a value lower than the true volume.  
+Also note that the bandwidth of the kernel density estimators at small resample sizes is drastically different then the bandwiths of larger resamples.  
 ```{r, fig.show='hold', out.width='50%'}
 funnel(hv_bootstrap_seq, title = 'Resampled variances from random points', func = function(x) {var(x@RandomPoints[,1])}) + 
   geom_line(aes(y = var(hv@Data[,1])))
