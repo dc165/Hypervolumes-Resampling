@@ -1,6 +1,6 @@
 ---
 title: "Power and Different sized hypervolumes"
-output: html_document
+output: github_document
 ---
 
 ```{r setup, include=FALSE}
