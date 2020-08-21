@@ -85,3 +85,25 @@ overlap.test <- function(hv1, hv2, path, alternative = "one-sided", bins = 100) 
   result = list(p_values = p_values, plots = plots, distribution = distribution)
   return(result)
 }
+
+# input are two bootstrap file path outputs from resample for two hypervolumes
+# returns confidence interval and distribution of overlap statistics for hypervolumes used to generate bootstraps
+overlap.confidence <- function(path1, path2, CI = .95) {
+  if(list.files(path1)[1] != "resample 1.rds" | list.files(path2)[1] != "resample 1.rds") {
+    stop("Invalid input")
+  }
+  distribution = foreach(i = list.files(path1), .combine = rbind) %:%
+    foreach(j = list.files(path2), .combine = rbind) %dopar% {
+      h1 = readRDS(file.path(path1, i))
+      h2 = readRDS(file.path(path2, j))
+      hypervolume_overlap_statistics(hypervolume_set(h1, h2, check.memory = FALSE))
+    }
+  results = list(
+    "jaccard" = quantile(distribution[,"jaccard"], c(.5 - CI/2, .5 + CI/2)),
+    "sorensen" = quantile(distribution[,"sorensen"], c(.5 - CI/2, .5 + CI/2)),
+    "frac_unique_1" = quantile(distribution[,"frac_unique_1"], c(.5 - CI/2, .5 + CI/2)),
+    "frac_unique_2" = quantile(distribution[,"frac_unique_2"], c(.5 - CI/2, .5 + CI/2)),
+    "distribution" = distribution
+  )
+  return(results)
+}

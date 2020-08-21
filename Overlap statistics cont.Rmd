@@ -5,9 +5,14 @@ output: html_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(cache = TRUE)
+library(ggplot2)
 library(hypervolume)
 library(doParallel)
-data(quercus)
+library(mvtnorm)
+source("Resample.R")
+source("Overlap.R")
+data("quercus")
 ```
 
 ```{r, include=FALSE}
@@ -17,10 +22,16 @@ cl = makeCluster(cores)
 clusterEvalQ(cl, {
   library(hypervolume)
   library(foreach)
+  library(mvtnorm)
+  library(ggplot2)
   source('Utils.R')
+  source("Resample.R")
+  source("Overlap.R")
 })
 registerDoParallel(cl)
 ```
+
+## Different sized hypervolumes from same data, tested with bootstrap and overlap test
 
 ```{r, include = FALSE}
 # Generating null distributions for samples of different size 150, and 300
@@ -30,6 +41,83 @@ hv_combine = hypervolume(rbind(hv_150@Data, hv_300@Data))
 ```
 
 ```{r}
+# Generate size 150 and size 300 hypervolumes from combined data
+#size_150_path = resample("quercus 150", hv_combine, "bootstrap", n = 100, points_per_resample = 150)
+#size_300_path = resample("quercus 300", hv_combine, "bootstrap", n = 100, points_per_resample = 300)
+size_150_path = "C:/Users/14842/Desktop/Hypervolumes-Resampling/Objects/quercus 150"
+size_300_path = "C:/Users/14842/Desktop/Hypervolumes-Resampling/Objects/quercus 300"
+```
 
+```{r, results='hide'}
+diff_size_results = overlap.test(hv_150, hv_300, c(size_150_path, size_300_path))
+```
+```{r}
+diff_size_results$plots$jaccard
+diff_size_results$plots$sorensen
+diff_size_results$plots$frac_unique_1
+diff_size_results$plots$frac_unique_2
+```
+
+## Power  
+```{r, results='hide'}
+base = hypervolume(rmvnorm(50, mean = c(0, 0), sigma = diag(nrow = 2)))
+```
+
+The result from the following code block (3 hr run time on 20 cores) shows Jacarrd and Sorensen have the highest power.  
+overlap.test will always show that sorensen and jaccard have the same p value and same power since they preserve the same order of observed value and resampled values.
+
+Conducts test 100 times and calculate percent of time we get true positive results i.e. p < 0.05
+Each test uses 400 (20 * 20) bootstrapped overlaps to generate null distribution.
+
+```{r}
+#power1 = foreach(i = 1:100, .combine = rbind) %dopar% {
+#  # Overlap base hypervolume with a hypervolume shifted 1/4 standard deviations in both dimension
+#  compare_hv = hypervolume(rmvnorm(50, mean = c(0.25, 0.25), sigma = diag(nrow = 2)))
+#  combine = hypervolume(rbind(base@Data, compare_hv@Data))
+#  path = resample(paste0("power_test_", as.character(i)), combine, "bootstrap", n = 40)
+#  path = file.path("./Objects", paste0("power_test_", i))
+#  results = overlap.test(base, compare_hv, path)
+#  unlist(results$p_values)
+#}
+```
+
+## Confidence Interval  
+
+The two samples are from different species but have a lot of overlap in Sepal width and Sepal length data.
+```{r}
+data("iris")
+hv1 = hypervolume(iris[iris$Species == "versicolor", c(1, 2)])
+hv2 = hypervolume(iris[iris$Species == "virginica", c(1, 2)])
+vscr_path = resample("versicolor resample", hv1, "bootstrap", n = 20, cores = 20)
+vrgn_path = resample("virginica resample", hv2, "bootstrap", n = 20, cores = 20)
+```
+
+```{r}
+overlap_confidence = overlap.confidence(vscr_path, vrgn_path)
+```
+```{r}
+overlap_confidence["jaccard"]
+overlap_confidence["sorensen"]
+overlap_confidence["frac_unique_1"]
+overlap_confidence["frac_unique_2"]
+```
+
+## Volume bias estimation
+
+Modified jackknife estimation of the bias (leave 2 out instead of leave 1 out) using the "k_split" method of resample. 
+
+Due to change in bandwidth, the jackknife resamples are larger on average than the observed volume. The calculated bias suggests that the estimated volume is larger than the true volume.
+
+```{r}
+#jackknife_sample = k_split("jackknife", hv_150, k = 75)
+jackknife_sample = "C:/Users/14842/Desktop/Hypervolumes-Resampling/Objects/jackknife"
+hvs_148 = to_hv_list(jackknife_sample)
+bias = get_volume(hv_150) - mean(get_volume(hvs_148))
+print(bias)
+```
+```{r}
+stopCluster(cl)
+stopImplicitCluster()
+registerDoSEQ()
 ```
 

@@ -72,32 +72,37 @@ bootstrap_seq <- function(name, hv, n = 10, points_per_resample = 'sample_size',
 
 
 # Outputs k hypervolumes each with (k-1)/k of the total points used to create input hypervolume
-k_split <- function(name, hv, k = 5, verbose = TRUE) {
+k_split <- function(name, hv, k = 5, cores = 1, verbose = TRUE) {
+  exists_cluster = TRUE
+  if(cores > 1 & getDoParWorkers() == 1) {
+    cl = makeCluster(cores)
+    clusterEvalQ(cl, {
+      library(hypervolume)
+      library(foreach)
+      source('Utils.R')
+    })
+    registerDoParallel(cl)
+    exists_cluster = FALSE
+  }
   dir.create(file.path('./Objects', name))
   npoints = nrow(hv@Data)
   shuffled = hv@Data[sample(1:npoints, npoints, replace = FALSE),]
   if(verbose) {
     pb = progress_bar$new(total = k*3)
   }
-  foreach(i = 1:k, .combine = c) %do% {
+  foreach(i = 1:k, .combine = c) %dopar% {
     range = (floor((i-1)*npoints/k) + 1):floor(i*npoints/k)
     train_dat = shuffled[-1 * range,]
-    test_dat = shuffled[range,]
-    dir_name = paste('split', as.character(i))
-    dir.create(file.path('./Objects', name, dir_name))
-    h = copy_param_hypervolume(hv, data = train_dat, name = paste("train", as.character(i)))
+    h = copy_param_hypervolume(hv, data = train_dat, name = paste("split", as.character(i)))
     path = paste0(h@Name, '.rds')
-    saveRDS(h, file.path('./Objects', name, dir_name, path))
-    if(verbose) {
-      pb$tick()
-      pb$tick()
-    }
-    t = copy_param_hypervolume(hv, data = test_dat, name = paste("test", as.character(i)))
-    path = paste0(t@Name, '.rds')
-    saveRDS(t, file.path('./Objects', name, dir_name, path))
+    saveRDS(h, file.path('./Objects', name, path))
     if(verbose) {
       pb$tick()
     }
+  }
+  if(!exists_cluster) {
+    stopCluster(cl)
+    registerDoSEQ()
   }
   return(file.path(getwd(), 'Objects', name))
 }
@@ -158,7 +163,7 @@ sampling_bias_bootstrap <- function(name, hv, n = 10, points_per_resample = 'sam
 # Single interface for resampling
 # Creates Objects directory in current working directory
 # Returns absolute path to file with hypervolume files
-resample <- function(name, hv, method, n = 10, points_per_resample = 'sample_size', seq = 3:nrow(hv@Data), cores = 1, verbose = TRUE, mu = NULL, sigma = NULL, cols_to_bias = 1:ncol(hv@Data)) {
+resample <- function(name, hv, method, n = 10, points_per_resample = 'sample_size', seq = 3:nrow(hv@Data), k = 5, cores = 1, verbose = TRUE, mu = NULL, sigma = NULL, cols_to_bias = 1:ncol(hv@Data)) {
   if (n <= 0) {
     stop("Invalid value for n")
   } else if (points_per_resample != "sample size" & points_per_resample <= 0) {
@@ -177,6 +182,8 @@ resample <- function(name, hv, method, n = 10, points_per_resample = 'sample_siz
     return(bootstrap_seq(name, hv, n, points_per_resample, seq, cores, verbose))
   } else if (method == 'biased bootstrap') {
     return(sampling_bias_bootstrap(name, hv, n, points_per_resample, cores, verbose, mu, sigma, cols_to_bias))
+  } else if (method == "k_split") {
+    return(k_split(name, hv, k, cores, verbose))
   }
 }
 
